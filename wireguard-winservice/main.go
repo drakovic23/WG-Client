@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -176,14 +175,14 @@ type Tunnel struct {
 }
 
 func (t *Tunnel) Configure(cfg deviceConfig) error {
-	prvKey := Base64ToHex(cfg.PrivateKey)
-	//if err != nil {
-	//	return err
-	//}
-	pubKey := Base64ToHex(cfg.PublicKey)
-	//if err != nil {
-	//	return err
-	//}
+	prvKey, err := wgtypes.ParseKey(cfg.PrivateKey)
+	if err != nil {
+		return err
+	}
+	pubKey, err := wgtypes.ParseKey(cfg.PublicKey)
+	if err != nil {
+		return err
+	}
 
 	endPoint, err := resolveEndpoint(context.Background(), cfg.EndPoint)
 	if err != nil {
@@ -192,7 +191,7 @@ func (t *Tunnel) Configure(cfg deviceConfig) error {
 	// Note replace peers is set to true so peers do not pile up if a different config is used
 	uapi := fmt.Sprintf(
 		"private_key=%s\nreplace_peers=true\npublic_key=%s\nendpoint=%s\nallowed_ip=%s\npersistent_keepalive_interval=%d\n",
-		prvKey, pubKey, endPoint, cfg.AllowedIp, cfg.KeepAlive)
+		hex.EncodeToString(prvKey[:]), hex.EncodeToString(pubKey[:]), endPoint, cfg.AllowedIp, cfg.KeepAlive)
 	if err := t.dev.IpcSet(uapi); err != nil {
 		return fmt.Errorf("IpcSet: %w", err)
 	}
@@ -263,17 +262,6 @@ func startWireguard(cfg deviceConfig) (*Tunnel, error) {
 
 	logger.Infof("Device started")
 	return t, nil
-}
-
-func Base64ToHex(base64string string) string {
-	decodedBytes, err := base64.StdEncoding.DecodeString(base64string)
-
-	if err != nil {
-		log.Fatalf("Failed to decode Base64 string %v", err)
-	}
-
-	hexStr := hex.EncodeToString(decodedBytes)
-	return hexStr
 }
 
 type addPeerRequest struct {

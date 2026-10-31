@@ -12,9 +12,11 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
+	"os/signal"
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/coreos/go-oidc"
@@ -53,6 +55,9 @@ type wgClient struct {
 	ifaceIp     net.IP
 	ifaceSubNet *net.IPNet
 }
+
+const maxBodyBytes = 64 * 1024
+const maxHeaderBytes = 1024 * 1024
 
 func main() {
 	var err error
@@ -132,12 +137,32 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", *port),
-		Handler:           mux,
+		Handler:           http.MaxBytesHandler(mux, maxBodyBytes),
 		TLSConfig:         m.TLSConfig(),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    maxHeaderBytes,
 	}
-	log.Printf("Listening on %s for %s (staging=%v)", srv.Addr, *domain, *staging)
-	log.Fatal(srv.ListenAndServeTLS("", ""))
+
+	go func() {
+		log.Printf("listening on %s for %s (staging=%v)", srv.Addr, *domain, *staging)
+		if err := srv.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+	}()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+
+	log.Println("shutting down")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown: %v", err)
+	}
 }
 
 func handleTokenValidation(r *http.Request) error {

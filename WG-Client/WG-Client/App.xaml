@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="WG_Client.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WG_Client"
+    xmlns:tb="using:H.NotifyIcon">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <!-- Other merged dictionaries here -->
+            </ResourceDictionary.MergedDictionaries>
+            <!-- Commands are declared here; their logic is attached in App.xaml.cs -->
+            <XamlUICommand x:Key="ShowHideWindowCommand" Label="Show/Hide" />
+            <XamlUICommand x:Key="ExitApplicationCommand" Label="Exit" />
+
+            <tb:TaskbarIcon
+                x:Key="TrayIcon"
+                ToolTipText="WG-Client"
+                LeftClickCommand="{StaticResource ShowHideWindowCommand}"
+                NoLeftClickDelay="True">
+
+                <!-- No .ico file needed while learning: the icon is generated from text -->
+                <tb:TaskbarIcon.IconSource>
+                    <tb:GeneratedIconSource Text="T" FontSize="40" FontWeight="Bold"
+                                            Foreground="White" Background="SteelBlue" />
+                </tb:TaskbarIcon.IconSource>
+
+                <!-- Right-click menu. You need an Exit item, because closing the window will only hide it -->
+                <tb:TaskbarIcon.ContextFlyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem Text="Show/Hide" Command="{StaticResource ShowHideWindowCommand}" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem Text="Exit" Command="{StaticResource ExitApplicationCommand}" />
+                    </MenuFlyout>
+                </tb:TaskbarIcon.ContextFlyout>
+            </tb:TaskbarIcon>
+
+        </ResourceDictionary>
+    </Application.Resources>    
+</Application>

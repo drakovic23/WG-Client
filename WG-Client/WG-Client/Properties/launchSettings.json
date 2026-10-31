@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "WG-Client (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "WG-Client (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+<Solution>
+  <Configurations>
+    <Platform Name="ARM64" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="WG-Client.Core/WG-Client.Core.csproj" />
+  <Project Path="WG-Client.Tests/WG-Client.Tests.csproj" />
+  <Project Path="WG-Client/WG-Client.csproj">
+    <Platform Solution="*|ARM64" Project="ARM64" />
+    <Platform Solution="*|x64" Project="x64" />
+    <Platform Solution="*|x86" Project="x86" />
+    <Deploy />
+  </Project>
+</Solution>

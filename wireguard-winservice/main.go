@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"net/netip"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/drakovic23/wg-vpn/wireguard-winservice/winpipe"
 	"github.com/kardianos/service"
+	"golang.org/x/sys/windows"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
@@ -208,6 +210,23 @@ func (t *Tunnel) Configure(cfg deviceConfig) error {
 	if err != nil {
 		return fmt.Errorf("parse allowed IP: %w", err)
 	}
+
+	// Bind the wireguard socket to the lowest metric adapter
+	// TODO: ipv6
+	// TODO: This should be done elsewhere and done if network changes are detected
+	bind, ok := t.dev.Bind().(conn.BindSocketToInterface)
+	if ok {
+		ifaceIndex, err := getIfaceIndex(t.luid)
+		if err != nil {
+			return err
+		}
+
+		err = bind.BindSocketToInterface4(ifaceIndex, false)
+		if err != nil {
+			bind.BindSocketToInterface4(ifaceIndex, true)
+			return err
+		}
+	}
 	// this will flushe the interface's routes first, so old config routes go away.
 	return t.luid.SetRoutes([]*winipcfg.RouteData{
 		{Destination: dest, NextHop: netip.IPv4Unspecified()},
@@ -237,7 +256,7 @@ type Keys struct {
 }
 
 func startWireguard(cfg deviceConfig) (*Tunnel, error) {
-	const interfaceName = "Test-Interface"
+	const interfaceName = "Wg-Interface"
 	devLogger := device.NewLogger(device.LogLevelVerbose, fmt.Sprintf("(%s)", interfaceName))
 
 	newTun, err := tun.CreateTUN(interfaceName, 0)
@@ -262,6 +281,47 @@ func startWireguard(cfg deviceConfig) (*Tunnel, error) {
 
 	logger.Infof("Device started")
 	return t, nil
+}
+
+// Returns the interface index of the lowest metric adapter.
+// tunnelLuid is the luid of the wireguard adapter
+func getIfaceIndex(tunnelLuid winipcfg.LUID) (uint32, error) {
+	forwardTable, err := winipcfg.GetIPForwardTable2(windows.AF_INET)
+	if err != nil {
+		return 0, fmt.Errorf("error getting IP forwarding table: %w", err)
+	}
+
+	if forwardTable == nil {
+		return 0, fmt.Errorf("no IP forwarding table found")
+	}
+
+	// Find lowest metric
+	// The lowest metric,
+	var minMetric uint32 = math.MaxUint32
+	var ifaceIndex uint32 = 0
+	for _, forward := range forwardTable {
+		// Skip any non-default interfaces and skip the tunnel interface
+		if forward.DestinationPrefix.PrefixLength != 0 || forward.InterfaceLUID == tunnelLuid {
+			continue
+		}
+		// Skip any interfaces that aren't up or error out
+		ifaceInfo, err := forward.InterfaceLUID.Interface()
+		if err != nil || ifaceInfo.OperStatus != winipcfg.IfOperStatusUp {
+			continue
+		}
+		iface, err := ifaceInfo.InterfaceLUID.IPInterface(windows.AF_INET)
+		if err != nil {
+			continue
+		}
+		// Both the route and interface metric need to be considered
+		metric := forward.Metric + iface.Metric
+		if metric < minMetric {
+			minMetric = forward.Metric
+			ifaceIndex = forward.InterfaceIndex
+		}
+	}
+
+	return ifaceIndex, nil
 }
 
 type addPeerRequest struct {

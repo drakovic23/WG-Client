@@ -6,6 +6,7 @@ require (
 	github.com/coreos/go-oidc v2.5.0+incompatible
 	golang.org/x/crypto v0.58.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
+	gopkg.in/go-jose/go-jose.v2 v2.6.3
 )
 
 require (
@@ -21,5 +22,4 @@ require (
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173 // indirect
-	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 )

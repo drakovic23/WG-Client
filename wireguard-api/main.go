@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/netip"
 	"os"
 	"os/signal"
 	"slices"
@@ -256,31 +255,16 @@ func (s *wgClient) addPeerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	AllowedIp, err := getSubnetAddress(tunIp.String())
+	//AllowedIp, err := getSubnetAddress(tunIp.String())
 	addPeerResp := addPeerResponse{
 		ServerPublicKey: wgInterface.PublicKey.String(),
 		ListenPort:      wgInterface.ListenPort,
 		TunnelIP:        tunIp.String(),
-		AllowedIPs:      AllowedIp,
+		AllowedIPs:      "0.0.0.0/0",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(addPeerResp)
-}
-
-func getSubnetAddress(address string) (string, error) {
-	addr, err := netip.ParseAddr(address)
-
-	if err != nil {
-		panic(err)
-	}
-
-	prefix, err := addr.Prefix(24)
-	if err != nil {
-		panic(err)
-	}
-
-	return prefix.String(), nil
 }
 
 // var test = "10.8.0.3"

@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/drakovic23/wg-vpn/wireguard-winservice/winpipe"
@@ -172,8 +173,13 @@ func (p *program) Stop(s service.Service) error {
 }
 
 type Tunnel struct {
-	dev  *device.Device
-	luid winipcfg.LUID
+	dev         *device.Device
+	luid        winipcfg.LUID
+	routeCb     *winipcfg.RouteChangeCallback
+	ifaceCb     *winipcfg.InterfaceChangeCallback
+	mu          sync.Mutex
+	rebindTimer *time.Timer
+	lastIndex   uint32
 }
 
 func (t *Tunnel) Configure(cfg deviceConfig) error {
@@ -211,26 +217,66 @@ func (t *Tunnel) Configure(cfg deviceConfig) error {
 		return fmt.Errorf("parse allowed IP: %w", err)
 	}
 
-	// Bind the wireguard socket to the lowest metric adapter
-	// TODO: ipv6
-	// TODO: This should be done elsewhere and done if network changes are detected
-	bind, ok := t.dev.Bind().(conn.BindSocketToInterface)
-	if ok {
-		ifaceIndex, err := getIfaceIndex(t.luid)
-		if err != nil {
-			return err
-		}
-
-		err = bind.BindSocketToInterface4(ifaceIndex, false)
-		if err != nil {
-			bind.BindSocketToInterface4(ifaceIndex, true)
-			return err
-		}
-	}
 	// this will flushe the interface's routes first, so old config routes go away.
 	return t.luid.SetRoutes([]*winipcfg.RouteData{
 		{Destination: dest, NextHop: netip.IPv4Unspecified()},
 	})
+}
+
+func (t *Tunnel) rebind() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	index, err := getIfaceIndex(t.luid)
+	if err != nil {
+		return err
+	}
+	if index == t.lastIndex {
+		return nil
+	}
+
+	bind, ok := t.dev.Bind().(conn.BindSocketToInterface)
+	if !ok {
+		return fmt.Errorf("bind does not support interface binding")
+	}
+	// index 0 means no usable adapter, so drop instead of looping
+	if err := bind.BindSocketToInterface4(index, index == 0); err != nil {
+		return fmt.Errorf("bind socket to interface %d: %w", index, err)
+	}
+	t.lastIndex = index
+	return nil
+}
+
+// Monitors for network changes and will bind the wg socket to lowest metric adapter
+func (t *Tunnel) startRouteMonitor() error {
+	t.lastIndex = math.MaxUint32
+	t.rebindTimer = time.AfterFunc(time.Hour, func() {
+		if err := t.rebind(); err != nil {
+			logger.Errorf("Rebinding socket failed: %v", err)
+		}
+	})
+	t.rebindTimer.Stop()
+	schedule := func() { t.rebindTimer.Reset(200 * time.Millisecond) }
+
+	routeCb, err := winipcfg.RegisterRouteChangeCallback(func(_ winipcfg.MibNotificationType, route *winipcfg.MibIPforwardRow2) {
+		if route != nil && route.DestinationPrefix.PrefixLength == 0 {
+			schedule()
+		}
+	})
+	if err != nil {
+		return err
+	}
+	ifaceCb, err := winipcfg.RegisterInterfaceChangeCallback(func(n winipcfg.MibNotificationType, _ *winipcfg.MibIPInterfaceRow) {
+		if n == winipcfg.MibParameterNotification {
+			schedule()
+		}
+	})
+	if err != nil {
+		routeCb.Unregister()
+		return err
+	}
+	t.routeCb, t.ifaceCb = routeCb, ifaceCb
+	return nil
 }
 
 func (t *Tunnel) Done() <-chan struct{} { return t.dev.Wait() }
@@ -274,7 +320,15 @@ func startWireguard(cfg deviceConfig) (*Tunnel, error) {
 		dev.Close() // also closes the Wintun adapter
 		return nil, fmt.Errorf("bring device up: %w", err)
 	}
-	if err := t.Configure(cfg); err != nil {
+
+	// Bind the socket to the lowest metric adapter
+	err = t.startRouteMonitor()
+	if err != nil {
+		return t, err
+	}
+
+	err = t.Configure(cfg)
+	if err != nil {
 		dev.Close()
 		return nil, err
 	}

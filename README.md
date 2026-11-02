@@ -9,6 +9,8 @@ A Windows VPN client that signs users in with Microsoft Entra ID, enrolls the de
 **This is an educational project and isn't intended for production use.**
 
 Importing a connection, signing in with Microsoft Entra ID, and connecting. The public IP changes from the home network to the VPN server.
+
+
 ![WG-Client screenshot](docs/screenshot.gif)
 
 ## Highlights

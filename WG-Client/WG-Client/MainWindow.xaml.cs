@@ -205,6 +205,22 @@ namespace WG_Client
             }
         }
 
+        private async void OnDeleteConnectionClick(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is not Connection connection)
+                return;
+
+            string host = connection.Host;
+
+            Debug.WriteLine($"Received delete for hostname: {host}");
+            ConfigHandler.DeleteConfig(connection);
+
+            if(SelectedConnection == connection)
+                SelectedConnection = null;
+
+            Connections.Remove(connection);
+        }
+
         private async void OnAboutClick(object sender, RoutedEventArgs e)
         {
 

@@ -63,7 +63,7 @@
                 </CommandBar>
             </Grid>
         </Border>
-        
+
         <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Padding="4,12,4,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -113,11 +113,13 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBlock VerticalAlignment="Center"
-                       Style="{StaticResource SubheaderTextBlockStyle}" FontSize="18"
-                       Text="{x:Bind Host}"/>
+                                Style="{StaticResource SubheaderTextBlockStyle}" 
+                                FontSize="18"
+                                Text="{x:Bind Host}"/>
 
                             <!-- Status Icons -->
                             <Grid Grid.Column="1" Width="24" Height="24">
@@ -129,14 +131,32 @@
                                 <FontIcon Glyph="&#xE711;" FontSize="24"
                           Foreground="{ThemeResource SystemFillColorCriticalBrush}"
                           Visibility="{x:Bind Disconnected, Mode=OneWay}"/>
-                                <FontIcon Glyph="&#xE871;" FontSize="24"
+                                <FontIcon Glyph="&#xE8C9;" FontSize="24"
                                   Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                                  Visibility="{x:Bind ErrorConnecting, Mode=OneWay}">
-                                    <FontIcon.RenderTransform>
-                                        <TranslateTransform X="2" Y="-2"/>
-                                    </FontIcon.RenderTransform>
+                                  Visibility="{x:Bind ErrorConnecting, Mode=OneWay}"
+                                  ToolTipService.ToolTip="Connection failed">
                                 </FontIcon>
                             </Grid>
+
+                            <Button Grid.Column="2"
+                                Width="36" Height="36"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                VerticalAlignment="Center"
+                                ToolTipService.ToolTip="More options">
+                                <FontIcon Glyph="&#xE712;" FontSize="16"/>
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedRight"
+                                                ShouldConstrainToRootBounds="False">
+                                        <MenuFlyoutItem Text="Delete"
+                                            Icon="Delete"
+                                            Tag="{x:Bind}"
+                                            Click="OnDeleteConnectionClick"/>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>

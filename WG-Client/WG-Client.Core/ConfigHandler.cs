@@ -116,12 +116,23 @@ namespace WG_Client
         {
             var dir = Directory.CreateDirectory(ResolveDataStorePath());
             Debug.WriteLine($"Data directory (app view): {dir.FullName}");
-
-
         }
-        public static void ReadConfig(string connectionName)
-        {
 
+        public static void DeleteConfig(Connection connection)
+        {
+            string dataPath = ResolveDataStorePath();
+            string[] files = Directory.GetFiles(dataPath, "*.wgc");
+
+            foreach(var file in files)
+            {
+                string fileName = Path.GetFileName(file);
+                string[] split = fileName.Split(".wgc");
+
+                if(split.Length > 0 && split[0] == connection.Host)
+                {
+                    File.Delete(file);
+                }
+            }
         }
     }
 }

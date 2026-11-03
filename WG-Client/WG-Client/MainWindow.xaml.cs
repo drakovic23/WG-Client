@@ -215,6 +215,9 @@ namespace WG_Client
             Debug.WriteLine($"Received delete for hostname: {host}");
             ConfigHandler.DeleteConfig(connection);
 
+            if (CurrentConnection == connection)
+                _client.RequestDisconnect();
+
             if(SelectedConnection == connection)
                 SelectedConnection = null;
 
